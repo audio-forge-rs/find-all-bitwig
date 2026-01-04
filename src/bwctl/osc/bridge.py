@@ -89,6 +89,22 @@ class BitwigOSCBridge:
         """Toggle loop mode."""
         self.send("/repeat", -1)
 
+    def set_tempo(self, bpm: float) -> None:
+        """Set the tempo in BPM.
+
+        Args:
+            bpm: Tempo in beats per minute (20-666)
+        """
+        self.send("/tempo/raw", bpm)
+
+    def invoke_action(self, action_id: str) -> None:
+        """Invoke a Bitwig action by its ID.
+
+        Args:
+            action_id: The Bitwig action ID (e.g., "group_selected_tracks")
+        """
+        self.send("/action/invoke", action_id)
+
     # Track Operations
     def add_track(self, track_type: str) -> None:
         """Add a new track.
@@ -143,8 +159,27 @@ class BitwigOSCBridge:
             index: Track index (1-indexed)
             value: Volume value (0.0 to 1.0)
         """
+        # Touch the fader first (required for reliable value changes)
+        self.send(f"/track/{index}/volume/touched", 1)
         # DrivenByMoss uses 0-128 range
         self.send(f"/track/{index}/volume", int(value * 128))
+        # Release the touch
+        self.send(f"/track/{index}/volume/touched", 0)
+
+    def set_track_pan(self, index: int, value: float) -> None:
+        """Set track pan.
+
+        Args:
+            index: Track index (1-indexed)
+            value: Pan value (-1.0 = full left, 0.0 = center, 1.0 = full right)
+        """
+        # Touch the fader first (required for reliable value changes)
+        self.send(f"/track/{index}/pan/touched", 1)
+        # DrivenByMoss uses 0-128 range where 64 is center
+        pan_value = int((value + 1.0) * 64)  # Convert -1..1 to 0..128
+        self.send(f"/track/{index}/pan", pan_value)
+        # Release the touch
+        self.send(f"/track/{index}/pan/touched", 0)
 
     # Device Operations
     def open_device_browser(self) -> None:
@@ -174,6 +209,60 @@ class BitwigOSCBridge:
         """Cancel the browser."""
         self.send("/browser/cancel")
 
+    def add_device(self, device_name: str) -> None:
+        """Add a device by name to the current track (headless).
+
+        Uses the OscByMoss /device/add command to insert a device
+        directly without opening the browser.
+
+        Args:
+            device_name: Name of the device to add (e.g., "Polymer", "EQ-5")
+        """
+        self.send("/device/add", device_name)
+
+    def add_master_device(self, device_name: str) -> None:
+        """Add a device by name to the master track.
+
+        Args:
+            device_name: Name of the device to add (e.g., "Peak Limiter", "EQ-5")
+        """
+        self.send("/device/master/add", device_name)
+
+    def insert_master_preset(self, preset_path: str) -> None:
+        """Insert a preset file to the master track.
+
+        Args:
+            preset_path: Absolute path to the .bwpreset file
+        """
+        self.send("/device/master/file", preset_path)
+
+    def insert_preset(self, preset_path: str) -> None:
+        """Insert a preset file (.bwpreset) to the current track (headless).
+
+        Uses the DrivenByMoss /device/file command to insert a preset
+        directly without opening the browser.
+
+        Args:
+            preset_path: Absolute path to the .bwpreset file
+        """
+        self.send("/device/file", preset_path)
+
+    def select_next_device(self) -> None:
+        """Select the next device in the chain."""
+        self.send("/device/+", 1)
+
+    def select_previous_device(self) -> None:
+        """Select the previous device in the chain."""
+        self.send("/device/-", 1)
+
+    def swap_device_with_previous(self) -> None:
+        """Move the current device left (swap with previous device)."""
+        self.send("/device/swap/previous")
+
+    def swap_device_with_next(self) -> None:
+        """Move the current device right (swap with next device)."""
+        self.send("/device/swap/next")
+
     def set_device_bypass(self, bypass: bool | None = None) -> None:
         """Set or toggle device bypass.
 
@@ -190,7 +279,10 @@ class BitwigOSCBridge:
             index: Parameter index (1-8)
             value: Parameter value (0.0 to 1.0)
         """
+        # Touch the parameter first (required for reliable value changes)
+        self.send(f"/device/param/{index}/touched", 1)
         self.send(f"/device/param/{index}/value", int(value * 128))
+        self.send(f"/device/param/{index}/touched", 0)
 
     # Clip Operations
     def create_clip(self, track: int, slot: int, length_beats: int = 4) -> None:
@@ -224,6 +316,16 @@ class BitwigOSCBridge:
     def stop_all_clips(self) -> None:
         """Stop all playing clips."""
         self.send("/clip/stopall")
+
+    def insert_clip_file(self, track: int, slot: int, file_path: str) -> None:
+        """Insert a file (MIDI, audio) into a clip launcher slot.
+
+        Args:
+            track: Track index (1-indexed)
+            slot: Slot index (1-indexed)
+            file_path: Absolute path to the file to insert
+        """
+        self.send(f"/track/{track}/clip/{slot}/insertFile", file_path)
 
 
 # Global bridge instance

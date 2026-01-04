@@ -115,3 +115,34 @@ def record(
 
     console.print(f"[red]Recording to track {track}, slot {slot}[/red]")
     console.print("[dim]Press stop or launch again to finish[/dim]")
+
+
+@app.command("insert")
+def insert_file(
+    file_path: str = typer.Argument(..., help="Path to MIDI or audio file"),
+    track: int = typer.Option(1, "-t", "--track", help="Track number"),
+    slot: int = typer.Option(1, "-s", "--slot", help="Slot number"),
+) -> None:
+    """Insert a MIDI or audio file into a clip launcher slot.
+
+    Note: This inserts into the clip launcher, not the arranger timeline.
+    To place clips in the arranger, drag them from the clip launcher.
+
+    Examples:
+        bwctl clip insert /path/to/song.mid -t 1 -s 1
+        bwctl clip insert bass.mid -t 5 -s 1
+    """
+    import os
+
+    bridge = get_bridge()
+
+    # Resolve to absolute path
+    abs_path = os.path.abspath(file_path)
+
+    if not os.path.exists(abs_path):
+        console.print(f"[red]File not found:[/red] {abs_path}")
+        raise typer.Exit(1)
+
+    bridge.insert_clip_file(track, slot, abs_path)
+    console.print(f"[green]Inserted file into track {track}, slot {slot}[/green]")
+    console.print(f"[dim]File: {os.path.basename(abs_path)}[/dim]")

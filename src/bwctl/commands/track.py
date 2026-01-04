@@ -1,9 +1,11 @@
 """Track command for bwctl."""
 
+import time
 from typing import Optional
 
 import typer
 from rich.console import Console
+from rich.table import Table
 
 from bwctl.osc.bridge import get_bridge
 
@@ -133,3 +135,93 @@ def volume(
     bridge = get_bridge()
     bridge.set_track_volume(track_number, value)
     console.print(f"[green]Set track {track_number} volume to {value:.0%}[/green]")
+
+
+@app.command()
+def pan(
+    track_number: int = typer.Argument(..., help="Track number"),
+    value: float = typer.Argument(..., help="Pan (-1.0 = left, 0.0 = center, 1.0 = right)"),
+) -> None:
+    """Set track pan.
+
+    Examples:
+        bwctl track pan 1 0      # Center
+        bwctl track pan 3 -0.3   # 30% left
+        bwctl track pan 8 0.2    # 20% right
+    """
+    if value < -1 or value > 1:
+        console.print("[red]Pan must be between -1.0 (left) and 1.0 (right)[/red]")
+        raise typer.Exit(1)
+
+    bridge = get_bridge()
+    bridge.set_track_pan(track_number, value)
+
+    if value < 0:
+        pos = f"{abs(value):.0%} L"
+    elif value > 0:
+        pos = f"{value:.0%} R"
+    else:
+        pos = "Center"
+    console.print(f"[green]Set track {track_number} pan to {pos}[/green]")
+
+
+@app.command("list")
+def list_tracks(
+    count: int = typer.Option(20, "-n", "--count", help="Number of tracks to scan"),
+) -> None:
+    """List tracks with their names and devices.
+
+    Queries Bitwig via OSC to get track names by selecting each track
+    and listening for the response.
+
+    Examples:
+        bwctl track list
+        bwctl track list -n 10
+    """
+    from bwctl.osc.bridge import BitwigOSCBridge
+
+    # Create fresh bridge instance for receiving
+    bridge = BitwigOSCBridge()
+
+    results = []
+    current = {"num": 0, "name": None, "device": None}
+
+    def handle_all(address, *args):
+        if address == "/track/selected/name" and args and args[0]:
+            current["name"] = args[0]
+        elif address == "/device/name" and args and args[0]:
+            current["device"] = args[0]
+
+    bridge.dispatcher.set_default_handler(handle_all)
+    bridge.start_server()
+
+    console.print(f"[dim]Scanning {count} tracks...[/dim]")
+
+    for i in range(1, count + 1):
+        current["num"] = i
+        current["name"] = None
+        current["device"] = None
+
+        bridge.select_track(i)
+        time.sleep(0.3)
+
+        if current["name"]:
+            results.append({
+                "num": i,
+                "name": current["name"],
+                "device": current["device"]
+            })
+
+    bridge.stop_server()
+
+    # Build table
+    table = Table(title="Tracks")
+    table.add_column("#", style="dim", width=4)
+    table.add_column("Name", style="cyan")
+    table.add_column("Device", style="green")
+
+    for info in results:
+        table.add_row(str(info["num"]), info["name"], info["device"] or "")
+
+    console.print(table)
+    console.print(f"\n[dim]Found {len(results)} tracks[/dim]")

@@ -5,9 +5,9 @@ from typing import Optional
 import typer
 from rich.console import Console
 
+from bwctl.osc.bridge import get_bridge
 from bwctl.db.search import search_content
 from bwctl.db.models import ContentType
-from bwctl.osc.bridge import get_bridge
 
 console = Console()
 
@@ -16,17 +16,21 @@ app = typer.Typer(help="Device operations")
 
 @app.command()
 def add(
-    name: str = typer.Argument(..., help="Device name (fuzzy search)"),
+    name: str = typer.Argument(..., help="Device name (exact match for Bitwig devices)"),
     track: Optional[int] = typer.Option(None, "-t", "--track", help="Target track"),
+    browse: bool = typer.Option(False, "--browse", "-b", help="Open browser instead of direct insert"),
 ) -> None:
     """Add a device to the current or specified track.
 
-    Uses fuzzy search to find the device. Opens the browser with results.
+    Directly inserts the device by name (headless, no browser).
+    Use --browse to open the browser for fuzzy search instead.
 
     Examples:
         bwctl device add Polymer
         bwctl device add "EQ-5" -t 1
-        bwctl device add reverb
+        bwctl device add Phase-4
+        bwctl device add E-Kick
+        bwctl device add Reverb --browse  # Use browser
     """
     bridge = get_bridge()
 
@@ -35,23 +39,82 @@ def add(
         bridge.select_track(track)
         console.print(f"[dim]Selected track {track}[/dim]")
 
-    # Search for device in database
+    if browse:
+        # Open device browser for fuzzy search
+        bridge.open_device_browser()
+        console.print(f"[green]Opening browser for:[/green] {name}")
+        console.print("[dim]Use browser navigation or type to search[/dim]")
+    else:
+        # Direct headless insertion
+        bridge.add_device(name)
+        console.print(f"[green]Added device:[/green] {name}")
+
+
+@app.command()
+def load(
+    preset_name: str = typer.Argument(..., help="Preset name to search and load"),
+    device: Optional[str] = typer.Option(None, "-d", "--device", help="Filter by device name"),
+    track: Optional[int] = typer.Option(None, "-t", "--track", help="Target track"),
+) -> None:
+    """Load a preset by name (searches database and inserts the .bwpreset file).
+
+    This is the headless way to load presets with specific settings.
+
+    Examples:
+        bwctl device load "DX-80s"
+        bwctl device load "Sub Kick" -d E-Kick
+        bwctl device load "Dark Snare" -t 7
+    """
+    bridge = get_bridge()
+
+    # Select track if specified
+    if track:
+        bridge.select_track(track)
+        console.print(f"[dim]Selected track {track}[/dim]")
+
+    # Search for preset in database
     results = search_content(
-        query=name,
+        query=preset_name,
         content_type=ContentType.PRESET,
         limit=5,
     )
 
-    if results:
-        console.print(f"[dim]Found {len(results)} matches:[/dim]")
-        for r in results[:3]:
-            console.print(f"  - {r.name} ({r.parent_device or 'device'})")
+    # Filter by device if specified
+    if device and results:
+        results = [r for r in results if r.parent_device and device.lower() in r.parent_device.lower()]
 
-    # Open device browser
-    bridge.open_device_browser()
-    console.print()
-    console.print(f"[green]Opening browser for:[/green] {name}")
-    console.print("[dim]Use browser navigation or type to search[/dim]")
+    if not results:
+        console.print(f"[red]No preset found for:[/red] {preset_name}")
+        if device:
+            console.print(f"[dim]Filtered by device: {device}[/dim]")
+        raise typer.Exit(1)
+
+    # Use the first match
+    best_match = results[0]
+    if not best_match.file_path:
+        console.print(f"[red]Preset found but no file path:[/red] {best_match.name}")
+        raise typer.Exit(1)
+
+    # Insert the preset file
+    bridge.insert_preset(best_match.file_path)
+    console.print(f"[green]Loaded preset:[/green] {best_match.name}")
+    if best_match.parent_device:
+        console.print(f"[dim]Device: {best_match.parent_device}[/dim]")
+
+
+@app.command()
+def master(
+    device_name: str = typer.Argument(..., help="Device name to add to master"),
+) -> None:
+    """Add a device to the master track.
+
+    Examples:
+        bwctl device master "Peak Limiter"
+        bwctl device master EQ-5
+    """
+    bridge = get_bridge()
+    bridge.add_master_device(device_name)
+    console.print(f"[green]Added to master:[/green] {device_name}")
 
 
 @app.command()

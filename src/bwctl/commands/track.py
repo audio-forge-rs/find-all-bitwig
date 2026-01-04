@@ -87,6 +87,71 @@ def exit() -> None:
 
 
 @app.command()
+def bank(
+    direction: str = typer.Argument("show", help="Direction: next, prev, page-next, page-prev, or show"),
+) -> None:
+    """Navigate or show track bank position.
+
+    The track bank is a sliding window over tracks.
+    Use this to scroll to see different tracks.
+
+    Examples:
+        bwctl track bank show      # Show current bank position
+        bwctl track bank next      # Scroll one track forward
+        bwctl track bank prev      # Scroll one track back
+        bwctl track bank page-next # Scroll one page forward
+        bwctl track bank page-prev # Scroll one page back
+    """
+    from bwctl.osc.bridge import BitwigOSCBridge
+
+    bridge = BitwigOSCBridge()
+
+    if direction == "show":
+        # Query current bank position
+        track_slots = set()
+
+        def handler(addr, *args):
+            if addr.startswith("/track/"):
+                parts = addr.split("/")
+                if len(parts) >= 3 and parts[2].isdigit():
+                    track_slots.add(int(parts[2]))
+
+        bridge.dispatcher.set_default_handler(handler)
+        bridge.start_server()
+        time.sleep(0.1)
+        bridge.send("/refresh")
+        time.sleep(1.5)
+        bridge.stop_server()
+
+        if track_slots:
+            slots = sorted(track_slots)
+            console.print(f"Track bank showing slots: [cyan]{min(slots)}[/cyan] - [cyan]{max(slots)}[/cyan]")
+        else:
+            console.print("[yellow]No track data received[/yellow]")
+
+    elif direction == "next":
+        bridge.scroll_track_bank(1)
+        console.print("[green]Scrolled track bank forward[/green]")
+
+    elif direction == "prev":
+        bridge.scroll_track_bank(-1)
+        console.print("[green]Scrolled track bank back[/green]")
+
+    elif direction == "page-next":
+        bridge.scroll_track_bank_page(1)
+        console.print("[green]Scrolled track bank forward one page[/green]")
+
+    elif direction == "page-prev":
+        bridge.scroll_track_bank_page(-1)
+        console.print("[green]Scrolled track bank back one page[/green]")
+
+    else:
+        console.print(f"[red]Unknown direction: {direction}[/red]")
+        console.print("Valid: show, next, prev, page-next, page-prev")
+        raise typer.Exit(1)
+
+
+@app.command()
 def mute(
     track_numbers: list[int] = typer.Argument(..., help="Track number(s) to mute"),
     off: bool = typer.Option(False, "--off", help="Unmute instead of mute"),
@@ -192,66 +257,64 @@ def pan(
 
 
 @app.command("list")
-def list_tracks(
-    count: int = typer.Option(20, "-n", "--count", help="Number of tracks to scan"),
-) -> None:
-    """List tracks with their names and devices.
+def list_tracks() -> None:
+    """List tracks in the current track bank.
 
-    Queries Bitwig via OSC to get track names by selecting each track
-    and listening for the response.
+    Shows tracks visible in the current track bank view.
+    Use 'bwctl track bank' commands to navigate.
 
     Examples:
         bwctl track list
-        bwctl track list -n 10
     """
     from bwctl.osc.bridge import BitwigOSCBridge
-
-    # Create fresh bridge instance for receiving
-    bridge = BitwigOSCBridge()
-
-    results = []
-    current = {"num": 0, "name": None, "device": None}
-
     import logging
     logger = logging.getLogger(__name__)
 
+    bridge = BitwigOSCBridge()
+    tracks = {}  # {track_num: {name, type, isGroup, ...}}
+
     def handle_all(address, *args):
         logger.debug(f"OSC RECV: {address} {args}")
-        if address == "/track/selected/name" and args and args[0]:
-            current["name"] = args[0]
-        elif address == "/device/name" and args and args[0]:
-            current["device"] = args[0]
+        # Parse /track/N/property messages (skip clip/send data)
+        if address.startswith("/track/") and "/clip/" not in address and "/send/" not in address:
+            parts = address.split("/")
+            if len(parts) >= 4 and parts[2].isdigit():
+                track_num = int(parts[2])
+                prop = parts[3]
+                if track_num not in tracks:
+                    tracks[track_num] = {}
+                if args and args[0] not in (None, ""):
+                    tracks[track_num][prop] = args[0]
 
     bridge.dispatcher.set_default_handler(handle_all)
     bridge.start_server()
+    time.sleep(0.1)  # Let server start
 
-    console.print(f"[dim]Scanning {count} tracks...[/dim]")
-
-    for i in range(1, count + 1):
-        current["num"] = i
-        current["name"] = None
-        current["device"] = None
-
-        bridge.select_track(i)
-        time.sleep(0.3)
-
-        if current["name"]:
-            results.append({
-                "num": i,
-                "name": current["name"],
-                "device": current["device"]
-            })
+    console.print(f"[dim]Querying track bank...[/dim]")
+    bridge.send("/refresh")
+    time.sleep(2.5)  # Wait for response flood
 
     bridge.stop_server()
 
-    # Build table
-    table = Table(title="Tracks")
-    table.add_column("#", style="dim", width=4)
-    table.add_column("Name", style="cyan")
-    table.add_column("Device", style="green")
+    # Find tracks that exist
+    valid_tracks = [(num, info) for num, info in sorted(tracks.items())
+                    if info.get("exists") == 1 and info.get("name")]
 
-    for info in results:
-        table.add_row(str(info["num"]), info["name"], info["device"] or "")
+    logger.debug(f"Valid tracks: {len(valid_tracks)}")
+
+    # Build table
+    table = Table(title="Track Bank")
+    table.add_column("Slot", style="dim", width=4)
+    table.add_column("Name", style="cyan")
+    table.add_column("Type", style="yellow")
+    table.add_column("Pos", style="dim", width=4)
+
+    for num, info in valid_tracks:
+        name = info.get("name", "")
+        is_group = info.get("isGroup", 0)
+        track_type = "Group" if is_group else info.get("type", "track")
+        position = info.get("position", "?")
+        table.add_row(str(num), name, track_type, str(position))
 
     console.print(table)
-    console.print(f"\n[dim]Found {len(results)} tracks[/dim]")
+    console.print(f"\n[dim]Showing {len(valid_tracks)} tracks in current bank[/dim]")

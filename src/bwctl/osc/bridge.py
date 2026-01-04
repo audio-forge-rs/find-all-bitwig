@@ -138,6 +138,29 @@ class BitwigOSCBridge:
         """Exit current group to parent (hierarchical mode)."""
         self.send("/track/parent")
 
+    def scroll_track_bank(self, direction: int) -> None:
+        """Scroll track bank by one track.
+
+        Args:
+            direction: Positive to go to higher track numbers, negative to lower
+        """
+        # OSC /trackbank/+ moves to HIGHER track numbers
+        if direction > 0:
+            self.send("/trackbank/+", 1)
+        else:
+            self.send("/trackbank/-", 1)
+
+    def scroll_track_bank_page(self, direction: int) -> None:
+        """Scroll track bank by one page (8 tracks).
+
+        Args:
+            direction: Positive to go to higher track numbers, negative to lower
+        """
+        if direction > 0:
+            self.send("/trackbank/page/+", 1)
+        else:
+            self.send("/trackbank/page/-", 1)
+
     def set_track_mute(self, index: int, mute: bool | None = None) -> None:
         """Set or toggle track mute.
 

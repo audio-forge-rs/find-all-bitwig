@@ -1,17 +1,102 @@
 """Device command for bwctl."""
 
+import logging
+import time
 from typing import Optional
 
 import typer
 from rich.console import Console
+from rich.table import Table
 
-from bwctl.osc.bridge import get_bridge
+from bwctl.osc.bridge import get_bridge, BitwigOSCBridge
 from bwctl.db.search import search_content
 from bwctl.db.models import ContentType
 
 console = Console()
+logger = logging.getLogger(__name__)
 
 app = typer.Typer(help="Device operations")
+
+
+@app.command("list")
+def list_devices(
+    track: Optional[int] = typer.Option(None, "-t", "--track", help="Track to query"),
+    count: int = typer.Option(8, "-n", "--count", help="Max devices to scan"),
+) -> None:
+    """List devices in the current track's device chain.
+
+    Examples:
+        bwctl device list
+        bwctl device list -t 1
+        bwctl device list -n 16
+    """
+    bridge = BitwigOSCBridge()
+    devices = []
+    current = {"name": None, "bypassed": None}
+
+    def handle_osc(address, *args):
+        logger.debug(f"OSC RECV: {address} {args}")
+        if "/device/name" in address and args:
+            current["name"] = args[0] if args[0] else None
+        elif "/device/isEnabled" in address and args:
+            current["bypassed"] = not args[0]
+
+    bridge.dispatcher.set_default_handler(handle_osc)
+    bridge.start_server()  # Start server FIRST to catch responses
+
+    console.print(f"[dim]Scanning device chain...[/dim]")
+
+    # Select track to trigger device info (AFTER server fully started)
+    target_track = track or 1
+    bridge.select_track(target_track)
+
+    # Wait for OSC response (device info takes time to arrive)
+    time.sleep(0.8)
+
+    # Check first device
+    if current["name"]:
+        devices.append({
+            "num": 1,
+            "name": current["name"],
+            "bypassed": current["bypassed"]
+        })
+    else:
+        # No device on this track
+        bridge.stop_server()
+        console.print("[yellow]No devices found on track[/yellow]")
+        return
+
+    # Navigate through siblings
+    for i in range(2, count + 1):
+        prev_name = current["name"]
+        current["name"] = None
+        current["bypassed"] = None
+        bridge.select_next_device()
+        time.sleep(0.2)
+
+        if current["name"] and current["name"] != prev_name:
+            devices.append({
+                "num": i,
+                "name": current["name"],
+                "bypassed": current["bypassed"]
+            })
+        else:
+            break  # No more devices or looped back
+
+    bridge.stop_server()
+
+    # Build table
+    table = Table(title="Device Chain")
+    table.add_column("#", style="dim", width=4)
+    table.add_column("Device", style="cyan")
+    table.add_column("Status", style="green")
+
+    for dev in devices:
+        status = "[yellow]Bypassed[/yellow]" if dev["bypassed"] else "Active"
+        table.add_row(str(dev["num"]), dev["name"], status)
+
+    console.print(table)
+    console.print(f"\n[dim]Found {len(devices)} devices[/dim]")
 
 
 @app.command()

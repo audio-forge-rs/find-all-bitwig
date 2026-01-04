@@ -71,6 +71,14 @@ linear = 10 ** (dB / 20)
 - Selecting a group twice toggles its expanded/collapsed state
 - Use `--debug` flag to see OSC messages: `bwctl --debug track list`
 
+### Track Type Detection
+OSC provides `/track/selected/isGroup` to identify group vs regular tracks:
+```
+/track/selected/isGroup (1,)  → This is a group track
+/track/selected/isGroup (0,)  → Regular track (not a group)
+```
+Tracks outside a group appear at top level alongside the group itself.
+
 ## Transport
 - `/play 1` - Start playback
 - `/stop 1` - Stop playback

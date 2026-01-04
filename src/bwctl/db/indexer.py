@@ -122,18 +122,25 @@ def discover_packages(base_path: Path) -> list[dict]:
     """Discover Bitwig packages in a directory."""
     packages = []
 
-    # Pattern: installed-packages/5.0/Vendor/PackageName/
-    installed_packages = base_path / "installed-packages"
+    # Handle both:
+    # - base_path = .../installed-packages (the configured path)
+    # - base_path = .../Bitwig Studio (parent contains installed-packages)
+    if base_path.name == "installed-packages":
+        installed_packages = base_path
+    else:
+        installed_packages = base_path / "installed-packages"
+
     if installed_packages.exists():
+        # Pattern: installed-packages/5.0/Vendor/PackageName/
         for version_dir in installed_packages.iterdir():
-            if not version_dir.is_dir():
+            if not version_dir.is_dir() or version_dir.name.startswith("."):
                 continue
             for vendor_dir in version_dir.iterdir():
-                if not vendor_dir.is_dir():
+                if not vendor_dir.is_dir() or vendor_dir.name.startswith("."):
                     continue
                 vendor = vendor_dir.name
                 for package_dir in vendor_dir.iterdir():
-                    if not package_dir.is_dir():
+                    if not package_dir.is_dir() or package_dir.name.startswith("."):
                         continue
                     packages.append({
                         "name": package_dir.name,

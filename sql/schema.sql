@@ -84,16 +84,27 @@ CREATE TABLE content (
     modified_at     TIMESTAMP,
     indexed_at      TIMESTAMP DEFAULT NOW(),
 
-    -- Full-text Search
-    search_vector   TSVECTOR GENERATED ALWAYS AS (
-        setweight(to_tsvector('english', coalesce(name, '')), 'A') ||
-        setweight(to_tsvector('english', coalesce(description, '')), 'B') ||
-        setweight(to_tsvector('english', coalesce(category, '')), 'C') ||
-        setweight(to_tsvector('english', coalesce(array_to_string(tags, ' '), '')), 'C') ||
-        setweight(to_tsvector('english', coalesce(creator, '')), 'D') ||
-        setweight(to_tsvector('english', coalesce(parent_device, '')), 'B')
-    ) STORED
+    -- Full-text Search (populated by trigger)
+    search_vector   TSVECTOR
 );
+
+-- Trigger function to update search_vector
+CREATE OR REPLACE FUNCTION content_search_vector_update() RETURNS trigger AS $$
+BEGIN
+    NEW.search_vector :=
+        setweight(to_tsvector('english', coalesce(NEW.name, '')), 'A') ||
+        setweight(to_tsvector('english', coalesce(NEW.description, '')), 'B') ||
+        setweight(to_tsvector('english', coalesce(NEW.category, '')), 'C') ||
+        setweight(to_tsvector('english', coalesce(array_to_string(NEW.tags, ' '), '')), 'C') ||
+        setweight(to_tsvector('english', coalesce(NEW.creator, '')), 'D') ||
+        setweight(to_tsvector('english', coalesce(NEW.parent_device, '')), 'B');
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER content_search_vector_trigger
+    BEFORE INSERT OR UPDATE ON content
+    FOR EACH ROW EXECUTE FUNCTION content_search_vector_update();
 
 -- Collections
 CREATE TABLE collections (

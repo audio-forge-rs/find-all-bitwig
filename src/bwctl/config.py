@@ -11,6 +11,10 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class DatabaseSettings(BaseSettings):
     """Database connection settings."""
 
+    model_config = SettingsConfigDict(
+        env_prefix="BWCTL_DB_",
+    )
+
     host: str = "localhost"
     port: int = 5432
     name: str = "bwctl"

@@ -209,6 +209,49 @@ Big band horn section with multiple eras, articulations, and ensemble control. K
 
 ---
 
+## Control Note Timing Best Practices
+
+### The Golden Rule
+**Place all articulation keyswitches just BEFORE the note they affect.**
+
+This applies to:
+- Initial articulation setup (e.g., sustains at song start)
+- Mid-song articulation changes (e.g., switching to doits)
+- Resets after special articulations (e.g., back to sustains)
+- End-of-song resets (for clean looping)
+
+### Why Slightly Before?
+1. **Clean triggering** - Keyswitch fires, then note plays (no timing collision)
+2. **Loop compatibility** - Articulations reset properly when song loops
+3. **Predictable behavior** - Plugin has time to process the keyswitch
+
+### Recommended Offset
+Use **0.1 beats before** the target note:
+- Note at beat 16 → keyswitch at beat 15.9
+- Note at beat 0 (loop start) → reset keyswitch at beat 31.9 (end of song)
+
+### Example: MOJO 2 Phrase Endings with Doits/Falls
+
+```
+Beat   Event                    Purpose
+----   -----                    -------
+0      sustains keyswitch       Initial articulation
+...    (melody notes)
+14.9   doits keyswitch (v>110)  Trigger release articulation
+15     note ends with doit      Phrase 1 ending
+15.9   sustains keyswitch       Reset for next phrase
+16     note starts              Phrase 2 begins clean
+...    (melody notes)
+30.9   falls keyswitch (v>110)  Trigger release articulation
+31     note ends with fall      Phrase 2 ending
+31.9   sustains keyswitch       Reset for loop
+```
+
+### Sticky Keyswitches
+Most sample libraries use "sticky" keyswitches - once triggered, they stay active until another keyswitch is pressed. **Always reset to your default articulation after special articulations**, or subsequent notes will use the wrong technique.
+
+---
+
 ## Quick Reference: MIDI Techniques Summary
 
 ### Hammer-Ons/Pull-Offs (Electric Sunburst)

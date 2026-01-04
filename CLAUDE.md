@@ -95,7 +95,7 @@ To load Kontakt/M-Tron instruments via OSC:
 3. Save to `~/Documents/Bitwig Studio/Library/Presets/{Plugin Name}/`
 4. Run `bwctl index` to add to database
 5. Search: `bwctl search "Hofner Bass"`
-6. Load: `bwctl insert preset "Hofner Bass Wah (M-Tron)"`
+6. Load: `bwctl insert -s "Hofner Bass Wah" -t 1`  # -s for search, -t for track
 
 Preset metadata returned from search:
 - `name`: Preset name

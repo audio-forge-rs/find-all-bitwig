@@ -83,21 +83,10 @@ def insert(
         bridge.select_track(track)
         console.print(f"[dim]Selected track {track}[/dim]")
 
-    # Insert the file
-    # Note: DrivenByMoss doesn't have a direct "insert file" OSC command
-    # We need to use the browser or a custom extension
-    # For now, we'll open the browser and show what to do
-
+    # Insert the preset via OSC /device/file command
     console.print(f"[green]Inserting:[/green] {content_name}")
     console.print(f"[dim]Path: {file_path}[/dim]")
 
-    # Try to use browser approach
-    # This opens the device browser - user needs to navigate to the file
-    # A custom extension would allow direct file insertion
-    bridge.open_device_browser()
-    console.print()
-    console.print("[yellow]Browser opened in Bitwig.[/yellow]")
-    console.print(f"[dim]Navigate to: {file_path}[/dim]")
-    console.print()
-    console.print("[dim]Note: Direct file insertion requires DrivenByMoss to be running.[/dim]")
-    console.print("[dim]Configure in Bitwig: Settings > Controllers > Open Sound Control[/dim]")
+    # Use /device/file OSC command to insert preset directly
+    bridge.insert_preset(file_path)
+    console.print(f"[green]Inserted {content_name} on track {track or 'current'}[/green]")

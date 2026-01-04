@@ -4,7 +4,9 @@ import typer
 from rich.console import Console
 
 from bwctl import __version__
-from bwctl.commands import index, search
+from bwctl.commands import clip, device, index, track, transport
+from bwctl.commands.insert import insert as insert_cmd
+from bwctl.commands.search import search as search_cmd, stats as stats_cmd
 
 console = Console()
 
@@ -15,8 +17,16 @@ app = typer.Typer(
 )
 
 # Register command groups
-app.add_typer(search.app, name="search")
 app.add_typer(index.app, name="index")
+app.add_typer(track.app, name="track")
+app.add_typer(device.app, name="device")
+app.add_typer(clip.app, name="clip")
+app.add_typer(transport.app, name="transport")
+
+# Register direct commands
+app.command(name="search")(search_cmd)
+app.command(name="stats")(stats_cmd)
+app.command(name="insert")(insert_cmd)
 
 
 @app.command()
@@ -36,7 +46,7 @@ def search_shortcut(
 
     Example: bwctl s "warm pad"
     """
-    search.search(
+    search_cmd(
         query=query,
         content_type=content_type,
         device=device,
@@ -47,29 +57,23 @@ def search_shortcut(
     )
 
 
-# Future command stubs
-@app.command(hidden=True)
-def insert() -> None:
-    """Insert content into Bitwig (coming soon)."""
-    console.print("[yellow]Insert command coming soon![/yellow]")
+# Transport shortcuts
+@app.command()
+def play() -> None:
+    """Start playback (shortcut for 'transport play')."""
+    transport.play()
 
 
-@app.command(hidden=True)
-def track() -> None:
-    """Track operations (coming soon)."""
-    console.print("[yellow]Track command coming soon![/yellow]")
+@app.command()
+def stop() -> None:
+    """Stop playback (shortcut for 'transport stop')."""
+    transport.stop()
 
 
-@app.command(hidden=True)
-def device() -> None:
-    """Device operations (coming soon)."""
-    console.print("[yellow]Device command coming soon![/yellow]")
-
-
-@app.command(hidden=True)
-def clip() -> None:
-    """Clip operations (coming soon)."""
-    console.print("[yellow]Clip command coming soon![/yellow]")
+@app.command()
+def rec() -> None:
+    """Toggle recording (shortcut for 'transport record')."""
+    transport.record()
 
 
 if __name__ == "__main__":

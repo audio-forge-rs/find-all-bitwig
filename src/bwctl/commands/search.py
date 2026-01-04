@@ -11,10 +11,7 @@ from bwctl.db.search import get_stats, search_content
 
 console = Console()
 
-app = typer.Typer(help="Search for Bitwig content")
 
-
-@app.callback(invoke_without_command=True)
 def search(
     query: str = typer.Argument(..., help="Search query (supports fuzzy matching)"),
     content_type: Optional[str] = typer.Option(
@@ -100,7 +97,6 @@ def search(
         console.print(f"\n[dim]Found {len(results)} results[/dim]")
 
 
-@app.command()
 def stats() -> None:
     """Show content statistics."""
     try:

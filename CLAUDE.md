@@ -79,9 +79,13 @@ dB to linear: `linear = 10^(dB/20)`
 | -10| 0.32   | 41          |
 | -3 | 0.71   | 91          |
 
-### Track Bank
-- OSC controller configured for 200 tracks (no bank scrolling needed)
-- `/track/1` through `/track/200` directly addressable
+### Track Bank (Hierarchical Mode)
+- OSC controller set to **hierarchical** mode (not flat)
+- Group tracks appear at top level (track 1 = group itself)
+- Can insert devices directly on group tracks via `/track/1/select` + `/device/file`
+- Use `bwctl track enter N` to navigate into a group
+- Use `bwctl track exit` to navigate back to parent
+- Use `bwctl --debug` to see OSC send/recv messages
 
 ### Limitations
 - Group track volumes CANNOT be set via OSC (manual adjustment required)

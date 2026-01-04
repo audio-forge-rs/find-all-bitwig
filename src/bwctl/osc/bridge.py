@@ -1,9 +1,12 @@
 """OSC bridge for communicating with Bitwig via DrivenByMoss."""
 
+import logging
 from typing import Any, Callable
 import threading
 
 from pythonosc import udp_client
+
+logger = logging.getLogger(__name__)
 from pythonosc.dispatcher import Dispatcher
 from pythonosc.osc_server import ThreadingOSCUDPServer
 
@@ -70,6 +73,7 @@ class BitwigOSCBridge:
             address: OSC address path (e.g., "/track/1/select")
             *args: Message arguments
         """
+        logger.debug(f"OSC SEND: {address} {list(args)}")
         self.client.send_message(address, list(args))
 
     # Transport Controls
@@ -121,6 +125,18 @@ class BitwigOSCBridge:
             index: Track index (1-indexed)
         """
         self.send(f"/track/{index}/select")
+
+    def enter_group(self, index: int) -> None:
+        """Enter a group track (hierarchical mode).
+
+        Args:
+            index: Track index of the group (1-indexed)
+        """
+        self.send(f"/track/{index}/enter", 1)
+
+    def exit_group(self) -> None:
+        """Exit current group to parent (hierarchical mode)."""
+        self.send("/track/parent")
 
     def set_track_mute(self, index: int, mute: bool | None = None) -> None:
         """Set or toggle track mute.

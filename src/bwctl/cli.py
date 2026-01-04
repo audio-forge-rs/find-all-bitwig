@@ -1,5 +1,6 @@
 """Main CLI entry point for bwctl."""
 
+import logging
 import typer
 from rich.console import Console
 
@@ -15,6 +16,15 @@ app = typer.Typer(
     help="Bitwig Studio command line controller",
     no_args_is_help=True,
 )
+
+
+@app.callback()
+def main(
+    debug: bool = typer.Option(False, "--debug", "-d", help="Enable debug logging"),
+) -> None:
+    """Bitwig Studio command line controller."""
+    if debug:
+        logging.basicConfig(level=logging.DEBUG, format="%(name)s: %(message)s")
 
 # Register command groups
 app.add_typer(index.app, name="index")

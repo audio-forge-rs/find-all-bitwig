@@ -55,10 +55,21 @@ linear = 10 ** (dB / 20)
 - `/device/swap/next` - Move current device right
 
 ## Track Bank
+
+### Flat Mode (previous)
 - DrivenByMoss track window configured to 200 tracks
 - `/track/1` through `/track/200` are directly addressable
 - No need to scroll bank for typical projects
 - Group tracks count as tracks in the numbering
+
+### Hierarchical Mode (current)
+- Group tracks appear at top level
+- Track 1 = group track itself (can insert devices on it!)
+- Track 2+ = children inside the group (after entering)
+- `/track/{N}/enter 1` - enter a group to see its children
+- `/track/parent` - exit group to parent level
+- Selecting a group twice toggles its expanded/collapsed state
+- Use `--debug` flag to see OSC messages: `bwctl --debug track list`
 
 ## Transport
 - `/play 1` - Start playback

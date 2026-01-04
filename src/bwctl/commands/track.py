@@ -61,6 +61,32 @@ def select(
 
 
 @app.command()
+def enter(
+    track_number: int = typer.Argument(..., help="Group track number to enter"),
+) -> None:
+    """Enter a group track (hierarchical mode).
+
+    Example:
+        bwctl track enter 1
+    """
+    bridge = get_bridge()
+    bridge.enter_group(track_number)
+    console.print(f"[green]Entered group track {track_number}[/green]")
+
+
+@app.command()
+def exit() -> None:
+    """Exit current group to parent (hierarchical mode).
+
+    Example:
+        bwctl track exit
+    """
+    bridge = get_bridge()
+    bridge.exit_group()
+    console.print("[green]Exited to parent[/green]")
+
+
+@app.command()
 def mute(
     track_numbers: list[int] = typer.Argument(..., help="Track number(s) to mute"),
     off: bool = typer.Option(False, "--off", help="Unmute instead of mute"),
@@ -186,7 +212,11 @@ def list_tracks(
     results = []
     current = {"num": 0, "name": None, "device": None}
 
+    import logging
+    logger = logging.getLogger(__name__)
+
     def handle_all(address, *args):
+        logger.debug(f"OSC RECV: {address} {args}")
         if address == "/track/selected/name" and args and args[0]:
             current["name"] = args[0]
         elif address == "/device/name" and args and args[0]:
